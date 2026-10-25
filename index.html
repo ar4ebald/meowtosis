@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A looping photo-collage animation of real cats: legs that turn into cats, an endless tunnel of yawning mouths, and a purring mandala around a giant amber eye, with real meows.">
+<meta name="theme-color" content="#120f0e">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Meowtosis">
+<meta property="og:description" content="A looping photo-collage animation of real cats: legs that turn into cats, an endless tunnel of yawning mouths, and a purring mandala around a giant amber eye, with real meows.">
+<meta property="og:url" content="https://ar4ebald.github.io/meowtosis/">
+<meta property="og:image" content="https://ar4ebald.github.io/meowtosis/preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="favicon.png">
+<title>Meowtosis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DM+Mono:wght@400;500&display=swap">
+<style>
+[hidden] { display: none !important; }
+:root {
+  /* Layout: full-bleed canvas stage; the HUD is cut-paper strips pinned top-left and along the bottom edge */
+  --paper: #f7f2e6;
+  --tape: #f3a7ae;
+  --ink: #1c1917;
+  --stage: #120f0e;
+  --alarm: #d4402f;
+  --f-display: "Bagel Fat One", "Arial Black", Impact, sans-serif;
+  --f-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; overflow: hidden; }
+body { margin: 0; background: var(--stage); color: var(--ink); font-family: var(--f-mono); }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+.hud {
+  position: fixed; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
+  padding-block: calc(env(safe-area-inset-top, 0px) + 16px) calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.pin { filter: drop-shadow(1.5px 2.5px 0 rgba(20, 12, 4, .5)); }
+.bottom { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.bottom .pin, .credits { pointer-events: auto; }
+
+.strip {
+  position: relative; isolation: isolate; color: var(--ink);
+  transform: rotate(var(--r, 0deg));
+}
+.strip::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--strip-bg, var(--paper));
+  clip-path: polygon(0 7%, 5% 0, 50% 5%, 96% 0, 100% 10%, 99% 92%, 95% 100%, 47% 95%, 3% 100%, 0 89%);
+}
+.title {
+  margin: 0; padding: 10px 18px 9px;
+  font: 400 clamp(30px, 5vw, 50px)/1 var(--f-display); letter-spacing: .01em;
+}
+.tape {
+  --strip-bg: var(--tape);
+  margin: 0 0 0 12px; padding: 7px 12px;
+  font: 500 12px/1.25 var(--f-mono); text-transform: uppercase; letter-spacing: .12em;
+}
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; width: 100%; }
+.group { display: flex; align-items: center; gap: 4px; }
+.btn {
+  appearance: none; border: 0; margin: 0; background: none; cursor: pointer;
+  font: 500 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em;
+  padding: 11px 13px; min-width: 40px;
+  transition: transform .12s ease;
+}
+.btn:hover:not(:disabled) { --strip-bg: var(--tape); }
+.btn:active:not(:disabled) { transform: rotate(var(--r, 0deg)) translateY(1px); }
+.btn:focus-visible { outline: 3px solid var(--alarm); outline-offset: 3px; }
+.btn:disabled { cursor: default; color: rgba(28, 25, 23, .4); }
+.chip[aria-pressed="true"], .chip[aria-pressed="true"]:hover,
+.toggle[aria-expanded="true"] { --strip-bg: var(--ink); color: var(--paper); }
+.lbl { padding: 11px 10px; font: 500 11px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; }
+.val { min-width: 2.2ch; padding: 7px 8px 6px; text-align: center; font: 400 19px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.hint {
+  margin: 0 0 0 auto; color: var(--paper); opacity: .85;
+  font: 400 11px/1.3 var(--f-mono); letter-spacing: .06em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+}
+
+.credits { max-width: min(480px, 100%); }
+.credits .strip { padding: 14px 16px 12px; max-height: min(52vh, 420px); overflow-y: auto; }
+.credits h2 { margin: 0 0 8px; font: 500 11px/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: .12em; }
+.credits ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.credits li { font: 400 12px/1.4 var(--f-mono); }
+.credits a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.credits a:focus-visible { outline: 2px solid var(--alarm); outline-offset: 2px; }
+.credits small { display: block; margin-top: 8px; font: 400 11px/1.4 var(--f-mono); color: rgba(28, 25, 23, .72); }
+
+@media (max-width: 760px) { .hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="stage" role="img" aria-label="Animated photo collage of cats: a ginger cat on a wall above red rooftops whose legs turn into smaller cats while yawning tabby heads sprout from its back and kittens swing from its tail, an endless tunnel of black cats yawning out of each other's mouths, and a mirrored mandala of cats around a giant amber cat eye."></canvas>
+
+<div class="hud">
+  <header class="top">
+    <div class="pin"><h1 class="strip title" style="--r:-2.2deg">Meowtosis</h1></div>
+    <div class="pin"><p class="strip tape" id="sceneLabel" style="--r:1.3deg">Scene I · Nine lives at once</p></div>
+  </header>
+  <div class="bottom">
+    <section class="credits pin" id="credits" hidden aria-labelledby="creditsTitle">
+      <div class="strip" style="--r:-.6deg">
+        <h2 id="creditsTitle">Photos and sounds, via Wikimedia Commons</h2>
+        <ul>
+          <li>Ginger cat: <a href="https://commons.wikimedia.org/wiki/File:Cat_December_2005-1.jpg" target="_blank" rel="noopener">Alvesgaspar</a>, <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA 3.0</a></li>
+          <li>Black cat yawning: <a href="https://commons.wikimedia.org/wiki/File:Cat_Yawning_2.jpg" target="_blank" rel="noopener">Akira 001</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></li>
+          <li>Tabby yawn: Hisashi, frames <a href="https://commons.wikimedia.org/wiki/File:Tabby_cat-yawning-01.jpg" target="_blank" rel="noopener">1</a> <a href="https://commons.wikimedia.org/wiki/File:Tabby_cat-yawning-02.jpg" target="_blank" rel="noopener">2</a> <a href="https://commons.wikimedia.org/wiki/File:Tabby_cat-yawning-03.jpg" target="_blank" rel="noopener">3</a> <a href="https://commons.wikimedia.org/wiki/File:Tabby_cat-yawning-04a.jpg" target="_blank" rel="noopener">4</a>, <a href="https://creativecommons.org/licenses/by-sa/2.0/" target="_blank" rel="noopener">CC BY-SA 2.0</a></li>
+          <li>Amber eye: <a href="https://commons.wikimedia.org/wiki/File:PPM_cat_iris_iris.JPG" target="_blank" rel="noopener">Stefan Savov</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></li>
+          <li>Green eye: <a href="https://commons.wikimedia.org/wiki/File:Tony_ginger_tomcat.JPG" target="_blank" rel="noopener">Jeanne boleyn</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+          <li>Rooftops: <a href="https://commons.wikimedia.org/wiki/File:Kirchenb%C3%BChl,_Blick_%C3%BCber_die_D%C3%A4cher_von_Lauben_-_panoramio.jpg" target="_blank" rel="noopener">Mayer Richard</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></li>
+          <li>Meows: Heismark (<a href="https://commons.wikimedia.org/wiki/File:Meow_of_a_pleading_cat.oga" target="_blank" rel="noopener">1</a>, <a href="https://commons.wikimedia.org/wiki/File:GettingOutImpatient.ogg" target="_blank" rel="noopener">2</a>), public domain; <a href="https://commons.wikimedia.org/wiki/File:Maullido_de_gata_hembra_joven.ogg" target="_blank" rel="noopener">George Miquilena</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>; <a href="https://commons.wikimedia.org/wiki/File:Meow_of_a_Siamese_cat_-_freemaster2.wav" target="_blank" rel="noopener">freemaster2</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>; <a href="https://commons.wikimedia.org/wiki/File:Felis_silvestris_catus_meows.ogg" target="_blank" rel="noopener">Tobias Puderer</a>, <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA 3.0</a></li>
+          <li>Purr: <a href="https://commons.wikimedia.org/wiki/File:Purr_(10_sec_loopable).ogg" target="_blank" rel="noopener">Insanejeff</a>, public domain · Hiss: <a href="https://commons.wikimedia.org/wiki/File:Cat_hissing_-_Zabuhailo.wav" target="_blank" rel="noopener">Zabuhailo</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+        </ul>
+        <small>Photos cut out, recombined and animated; recordings trimmed and normalised. Each cutout and clip keeps its source's licence; the animation as a whole is shared under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.</small>
+      </div>
+    </section>
+    <nav class="bar" aria-label="Animation controls">
+      <div class="pin group" role="group" aria-label="Scenes">
+        <button type="button" class="strip btn chip" data-act="0" aria-pressed="true" aria-label="Scene I, Nine lives at once" style="--r:-2deg">I</button>
+        <button type="button" class="strip btn chip" data-act="1" aria-pressed="false" aria-label="Scene II, Endless yawn" style="--r:1.5deg">II</button>
+        <button type="button" class="strip btn chip" data-act="2" aria-pressed="false" aria-label="Scene III, Purr mandala" style="--r:-1deg">III</button>
+      </div>
+      <div class="pin"><button type="button" id="playBtn" class="strip btn" style="--r:1deg">Pause</button></div>
+      <div class="pin group" role="group" aria-label="Cats under cats">
+        <span class="strip lbl" style="--r:-1deg">Cats under cats</span>
+        <button type="button" id="depthDown" class="strip btn" aria-label="Fewer levels of cats" style="--r:2deg">−</button>
+        <output id="depthVal" class="strip val" aria-live="polite" style="--r:-1.5deg">3</output>
+        <button type="button" id="depthUp" class="strip btn" aria-label="More levels of cats" style="--r:-2deg">+</button>
+      </div>
+      <div class="pin"><button type="button" id="soundBtn" class="strip btn" aria-pressed="false" style="--r:-1.5deg">Sound off</button></div>
+      <div class="pin"><button type="button" id="creditsBtn" class="strip btn toggle" aria-expanded="false" aria-controls="credits" style="--r:1.2deg">Credits</button></div>
+      <p class="hint">Space pauses · ← → change scene</p>
+    </nav>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- small maths ---------- */
+const TAU = Math.PI * 2;
+const clamp = (x, a = 0, b = 1) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const frac = x => x - Math.floor(x);
+const elastic = t => t <= 0 ? 0 : t >= 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * TAU / 3) + 1;
+const hash = n => frac(Math.sin(n * 127.1 + 311.7) * 43758.5453);
+const env = (t, a, b) => smooth(a, a + 0.25, t) * (1 - smooth(b - 0.35, b, t));
+const bump = x => x > 0 && x < 0.38 ? Math.sin(x / 0.38 * Math.PI) : 0;
+function rampInt(t, a, b) { if (t <= a) return 0; if (t <= b) return (t - a) * (t - a) / (2 * (b - a)); return (b - a) / 2 + (t - b); }
+function blinkAt(t, times) { for (const tb of times) { const d = (t - tb) / 0.22; if (d > 0 && d < 1) return Math.sin(d * Math.PI); } return 0; }
+function blinkSeed(t, s) { const f = frac(t * 0.21 + hash(s) * 13); return f < 0.04 ? Math.sin(f / 0.04 * Math.PI) : 0; }
+function mk(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, w | 0); c.height = Math.max(1, h | 0); return c; }
+
+/* ---------- stage ---------- */
+const cv = document.getElementById('stage');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.imageSmoothingQuality = 'low'; // sprites carry their own halving chain, so plain bilinear is enough
+}
+
+/* ---------- photo assets: cutouts measured in their own pixels ---------- */
+const FILES = {
+  body: 'c-body.webp', head: 'c-head.webp', jaw: 'c-jaw.webp', tail: 'c-tail.webp',
+  fh: 'c-leg-fh.webp', nh: 'c-leg-nh.webp', nf: 'c-leg-nf.webp',
+  kHead: 'k-head.webp', y1: 't-yawn-1.webp', y2: 't-yawn-2.webp', y3: 't-yawn-3.webp', y4: 't-yawn-4.webp',
+  amberBall: 'eyeball-amber.webp', amberFull: 'eye-amber.webp', gingerFull: 'eye-ginger.webp',
+  sky: 'roof-sky.jpg', town: 'roof-town.webp', wall: 'wall.webp',
+  ginger: 'tex-ginger.jpg', black: 'tex-black.jpg', tabby: 'tex-tabby.jpg', roof: 'tex-roof.jpg',
+};
+const MEOWS = ['meow-a', 'meow-b', 'meow-c', 'meow-d', 'meow-e', 'meow-f', 'meow-g'];
+const CLIPS = [...MEOWS, 'hiss', 'purr'];
+const IMG = {}, SP = {}, PAT = {}, TILE = {};
+
+// Ginger cat, origin in the middle of the barrel. Boxes are [x, y, w, h].
+const CG = {
+  body: [-523, -205, 1045, 426], tail: [-697, -91, 422, 280], tailPivot: [-306, -57], tailTip: [-684, 182], tailAng: 2.85,
+  head: [381, -270, 263, 263], headPivot: [456, -102], jaw: [534, -61, 58, 31], hinge: [534, -57],
+  legs: [ // drawn in this order: far hind, far front (the near front leg, shaded), near hind, near front
+    { k: 'fh', box: [-573, 66, 97, 174], pivot: [-525, 102], ph: 0, front: false },
+    { k: 'nf', box: [184, 34, 140, 199], pivot: [253.2, 67.2], ph: Math.PI, front: true, far: [34, -4] },
+    { k: 'nh', box: [-270, 105, 273, 132], pivot: [-219, 147], ph: Math.PI, front: false },
+    { k: 'nf', box: [184, 34, 140, 199], pivot: [253.2, 67.2], ph: 0, front: true },
+  ],
+  eye: [555.6, -121.2], irisR: 10.8, mouth: [566, -54],
+  x0: -523, x1: 640,
+};
+const CLEN = CG.x1 - CG.x0, LEG = 139, HIP = 100;
+// Black cat's yawning head (the mouth is a hole), in its sprite's pixels
+const KG = {
+  w: 747, h: 742, mouth: [498.4, 578.4], face: [498.4, 426.4], lipY: 506.4,
+  eyes: [[407, 252, 104, 1], [657, 266, 70, 0.74]],
+  hole: [[352.8, 444], [506.4, 447.2], [594.4, 448.8], [664.8, 445.6], [620, 504.8], [560.8, 567.2], [522.4, 644], [498.4, 708], [413.6, 700], [372, 634.4], [340, 540]],
+};
+// Tabby yawn frames share one framing; the back of the head (its feathered left edge) sits on the neck about here
+const TG = { w: 574, h: 432, neck: [60, 260] };
+// Eyes: pupil centre and radii in each close-up's own pixels
+const EYE = {
+  ginger: { full: { w: 660, px: 330, py: 330, rx: 3.5, ry: 25, iris: 82 } },
+  amber: { full: { w: 1296, px: 648, py: 648, rx: 186, ry: 308, iris: 648 }, ball: { w: 342, px: 167.1, py: 170.4, rx: 49.1, ry: 81.3 } },
+};
+const KB = EYE.amber.ball.ry / EYE.amber.full.ry; // eyeball pixels per close-up pixel
+const ROOFS = { w: 1600, h: 1204, skyEnd: 583, townTop: 467 };
+const WALL = { w: 1600, h: 305, top: 15 };
+
+function loadImg(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.decoding = 'async'; i.onload = () => res(i); i.onerror = () => rej(new Error(src)); i.src = src; });
+}
+function sprite(img, x, y, w, h) {
+  const L = [img]; let c = img, cw = img.naturalWidth || img.width, ch = img.naturalHeight || img.height;
+  while (cw > 48 && L.length < 6) { // halving chain so tiny cats stay clean
+    cw = Math.ceil(cw / 2); ch = Math.ceil(ch / 2);
+    const n = mk(cw, ch), g = n.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, cw, ch);
+    L.push(n); c = n;
+  }
+  return { L, x, y, w, h, spu: (img.naturalWidth || img.width) / w };
+}
+function blit(c, s, sc) {
+  let i = 0, have = s.spu;
+  while (i < s.L.length - 1 && have * 0.5 >= sc) { have *= 0.5; i++; }
+  c.drawImage(s.L[i], s.x, s.y, s.w, s.h);
+}
+function shade(img, k) { // a darker copy, for the far legs
+  const c = mk(img.naturalWidth, img.naturalHeight), g = c.getContext('2d');
+  g.drawImage(img, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(40,18,6,${k})`; g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+function buildSprites() {
+  SP.body = sprite(IMG.body, ...CG.body);
+  SP.tail = sprite(IMG.tail, CG.tail[0] - CG.tailPivot[0], CG.tail[1] - CG.tailPivot[1], CG.tail[2], CG.tail[3]);
+  for (const L of CG.legs) {
+    const key = L.far ? 'ff' : L.k;
+    if (!SP[key]) SP[key] = sprite(L.far ? shade(IMG[L.k], 0.32) : IMG[L.k], L.box[0] - L.pivot[0], L.box[1] - L.pivot[1], L.box[2], L.box[3]);
+  }
+  const hp = CG.headPivot;
+  SP.head = sprite(IMG.head, CG.head[0] - hp[0], CG.head[1] - hp[1], CG.head[2], CG.head[3]);
+  SP.jaw = sprite(IMG.jaw, CG.jaw[0] - CG.hinge[0], CG.jaw[1] - CG.hinge[1], CG.jaw[2], CG.jaw[3]);
+  SP.kHead = sprite(IMG.kHead, 0, 0, KG.w, KG.h);
+  SP.yawn = ['y4', 'y3', 'y2', 'y1'].map(k => sprite(IMG[k], -TG.neck[0], -TG.neck[1], TG.w, TG.h)); // closed to wide open
+  const B = EYE.amber.ball;
+  SP.amberBall = sprite(IMG.amberBall, -B.px, -B.py, B.w, B.w);
+  for (const k of ['ginger', 'black', 'tabby', 'roof']) { TILE[k] = mirrorTile(IMG[k]); PAT[k] = ctx.createPattern(TILE[k], 'repeat'); }
+}
+function mirrorTile(img) { // four flipped copies, so a repeating pattern has no seams
+  const w = img.naturalWidth, h = img.naturalHeight, c = mk(2 * w, 2 * h), g = c.getContext('2d');
+  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    g.setTransform(sx, 0, 0, sy, sx < 0 ? 2 * w : 0, sy < 0 ? 2 * h : 0); g.drawImage(img, 0, 0);
+  }
+  return c;
+}
+
+/* ---------- drawing ---------- */
+let REC = null;           // collects the focus pupil's transform while the main scene draws
+let depth = 3, depthAnim = 3;
+const KID = 0.3;          // a leg-cat is this fraction of its parent
+
+function patScale(p, k) { p.setTransform(new DOMMatrix([k, 0, 0, k, 0, 0])); return p; }
+// a round amber eyeball, for black faces: it glances about and blinks by squashing
+function drawAmberBall(c, x, y, w, sx, lx, ly, blink, focus, sc) {
+  const B = EYE.amber.ball, s = w / B.w;
+  c.save(); c.translate(x + lx * w * 0.08, y + ly * w * 0.05); c.scale(s * sx, s * (1 - 0.92 * blink));
+  blit(c, SP.amberBall, sc * s);
+  if (focus && REC) { c.scale(KB, KB); REC.m = c.getTransform(); REC.kind = 'amber'; }
+  c.restore();
+}
+function groundShadow(c, x, y, rx, ry, a = 0.34) {
+  c.save(); c.translate(x, y); c.scale(1, ry / rx);
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, rx);
+  g.addColorStop(0, `rgba(40,30,20,${a})`); g.addColorStop(0.6, `rgba(40,30,20,${a * 0.45})`); g.addColorStop(1, 'rgba(40,30,20,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, rx, 0, TAU); c.fill();
+  c.restore();
+}
+function holePath(c, jy) {
+  c.beginPath();
+  KG.hole.forEach(([x, y], i) => { const yy = y > KG.lipY ? KG.lipY + (y - KG.lipY) * jy : y; i ? c.lineTo(x, yy) : c.moveTo(x, yy); });
+  c.closePath();
+}
+// the black cat's head, its jaw stretched open by jy, with amber eyes; inner() draws whatever is in its mouth
+function drawYawnHead(c, K, sc, inner) {
+  const jy = K.jy || 1;
+  if (inner) { c.save(); holePath(c, jy); c.clip(); inner(); c.restore(); }
+  c.save(); c.beginPath(); c.rect(-20, KG.lipY - 2, KG.w + 40, KG.h * 2); c.clip();
+  c.translate(0, KG.lipY); c.scale(1, jy); c.translate(0, -KG.lipY); blit(c, SP.kHead, sc); c.restore();
+  c.save(); c.beginPath(); c.rect(-20, -20, KG.w + 40, KG.lipY + 21); c.clip(); blit(c, SP.kHead, sc); c.restore();
+  KG.eyes.forEach(([x, y, w, sx], i) => drawAmberBall(c, x, y, w, sx, K.lx || 0, K.ly || 0, K.blink || 0, K.focus && i === 0, sc));
+}
+// a tabby head mid-yawn: y runs 0 (shut) to 1 (wide open) through four real photo frames
+function drawTabby(c, y, sc) {
+  const f = clamp(y) * 2.999, i = Math.floor(f), r = f - i;
+  blit(c, SP.yawn[i], sc);
+  if (r > 0.02) { c.globalAlpha *= r; blit(c, SP.yawn[i + 1], sc); c.globalAlpha /= r; }
+}
+function drawCatHead(c, P, sc, focus) { // drawn in the head pivot's frame
+  const hp = CG.headPivot, j = P.jaw || 0, mx = CG.mouth[0] - hp[0], my = CG.mouth[1] - hp[1];
+  if (j > 0.02) {
+    c.fillStyle = '#2a0d0b';
+    c.beginPath(); c.ellipse(mx - 6, my + 2 + j * 9, 30, 4 + j * 13, 0.25, 0, TAU); c.fill();
+    c.fillStyle = '#c5626a';
+    c.beginPath(); c.ellipse(mx - 12, my + 6 + j * 15, 16, 3 + j * 5, 0.3, 0, TAU); c.fill();
+  }
+  c.save(); c.translate(CG.hinge[0] - hp[0], CG.hinge[1] - hp[1]); c.rotate(j * 0.75); blit(c, SP.jaw, sc); c.restore();
+  if (P.mouthCat > 0.01) mouthCat(c, P, sc, mx, my);
+  blit(c, SP.head, sc);
+  if (P.blink > 0.02) { // the lid is ginger fur pulled down over the eye
+    c.save(); c.translate(CG.eye[0] - hp[0], CG.eye[1] - hp[1] - 2);
+    c.fillStyle = patScale(PAT.ginger, 0.35); c.beginPath(); c.ellipse(0, -13 + 13 * P.blink, 15, 13 * P.blink, 0.1, 0, TAU); c.fill(); c.restore();
+  }
+  if (focus && REC) {
+    c.save(); c.translate(CG.eye[0] - hp[0], CG.eye[1] - hp[1]); const k = CG.irisR / EYE.ginger.full.iris; c.scale(k, k);
+    REC.m = c.getTransform(); REC.kind = 'ginger'; c.restore();
+  }
+}
+function mouthCat(c, P, sc, mx, my) { // a small black cat pokes its yawning head out of the ginger cat's mouth
+  const a = P.mouthCat, s = 0.2 * a;
+  c.save(); c.translate(mx + 4 + 34 * a, my + 8 + 8 * a); c.rotate(-0.5 + 0.25 * Math.sin(P.t * 7)); c.scale(s, s);
+  c.translate(-KG.face[0], -KG.face[1]);
+  drawYawnHead(c, { jy: 1 + 0.25 * Math.max(0, Math.sin(P.t * 5)), lx: Math.sin(P.t * 3), ly: 0.3, blink: blinkSeed(P.t, 77) }, sc * s, () => {
+    c.fillStyle = '#1a0606'; c.fillRect(0, 0, KG.w, KG.h);
+  });
+  c.restore();
+}
+function childOf(P, i) {
+  const seed = P.seed * 4 + i + 1, h = hash(seed * 1.31);
+  return {
+    lvl: P.lvl + 1, seed, t: P.t,
+    walk: Math.min(0.7, P.walk * 1.3 + 0.16), phase: P.phase * 1.25 + h * TAU,
+    maxLvl: P.maxLvl, grow: P.grow,
+    jaw: Math.max(0, Math.sin(P.t * (2.2 + h * 2.5) + h * 30)) * 0.4 + (P.meowAll || 0) * 0.8,
+    blink: blinkSeed(P.t, seed), focus: false, meowAll: P.meowAll,
+    headRot: 0.1 * Math.sin(P.t * 1.9 + seed), tailSwish: 0.25,
+  };
+}
+function drawLimb(c, P, i, sc) {
+  const L = CG.legs[i];
+  const m = P.lvl < P.maxLvl ? P.grow(P.lvl + 1, i, P.seed) : 0;
+  c.save(); c.translate(L.pivot[0] + (L.far ? L.far[0] : 0), L.pivot[1] + (L.far ? L.far[1] : 0));
+  c.rotate(P.walk * Math.sin(P.phase + L.ph));
+  const ls = clamp(1 - m * 1.4);
+  if (ls > 0.01) { c.save(); c.scale(ls, ls); blit(c, SP[L.far ? 'ff' : L.k], sc * ls); c.restore(); }
+  if (m > 0.002) {
+    const s = KID * m;
+    c.rotate(Math.PI / 2);
+    if (L.front) c.scale(s, -s); else c.scale(s, s);
+    c.translate(-CG.x0, 0);
+    drawCat(c, childOf(P, i));
+  }
+  c.restore();
+}
+function drawCat(c, P) {
+  const m = c.getTransform(), sc = Math.hypot(m.a, m.b);
+  if (sc * CLEN < 4) return;
+  const X = P.extras; // only the main cat carries the extra growths
+  if (X) drawBackHeads(c, P, X, sc);
+  for (let i = 0; i < 4; i++) drawLimb(c, P, i, sc);
+  if (X) drawDangling(c, P, X, sc);
+  const br = Math.sin(P.t * 2.6 + P.seed) * 0.016; // breathing
+  c.save(); c.translate(0, 160); c.scale(1 + br * 0.4, 1 + br); c.translate(0, -160); blit(c, SP.body, sc); c.restore();
+  c.save(); c.translate(CG.tailPivot[0], CG.tailPivot[1]);
+  c.rotate((P.tailSwish ?? 0.12) * Math.sin(P.t * 2.3 + P.seed * 1.7));
+  blit(c, SP.tail, sc);
+  if (X) drawTailChain(c, P, X, sc);
+  c.restore();
+  if (X && X.snake > 0.01) drawHeadSnake(c, P, X, sc);
+  else {
+    const hp = CG.headPivot;
+    c.save(); c.translate(hp[0], hp[1]); c.rotate(P.headRot || 0); drawCatHead(c, P, sc, P.focus); c.restore();
+  }
+}
+
+/* ---------- the main cat's extra growths ---------- */
+function drawTailChain(c, P, X, sc) { // kittens hang off the tail tip, each by the last one's tail
+  const n = X.tail; if (n <= 0) return;
+  const t = P.t, segs = [];
+  let x = CG.tailTip[0] - CG.tailPivot[0], y = CG.tailTip[1] - CG.tailPivot[1], ang = CG.tailAng;
+  for (let k = 0; k < Math.ceil(n); k++) {
+    const s = 0.16 * (1 - 0.06 * k) * elastic(clamp(n - k));
+    ang += 0.3 * Math.sin(t * 2.9 - k * 0.8) + 0.24; // curling up and over, like a happy tail
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    segs.push({ x: x + dx * -CG.x0 * s, y: y + dy * -CG.x0 * s, ang, s, k });
+    const tipD = (CG.tailTip[0] - CG.x0) * s; // that kitten's own tail tip, behind its rump
+    x += dx * (CLEN * s * 0.9 - tipD * 0.4); y += dy * (CLEN * s * 0.9 - tipD * 0.4);
+  }
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const g = segs[i]; if (g.s < 0.004) continue;
+    c.save(); c.translate(g.x, g.y); c.rotate(g.ang + Math.PI); c.scale(g.s, g.k % 2 ? -g.s : g.s);
+    drawCat(c, {
+      lvl: 9, seed: 700 + g.k, t, walk: 0.55, phase: t * 8 + g.k, maxLvl: 0, grow: () => 0, tailSwish: 0.3,
+      jaw: Math.max(0, Math.sin(t * 4 + g.k)) * 0.6, blink: blinkSeed(t, 700 + g.k), headRot: 0.2 * Math.sin(t * 3 + g.k),
+    });
+    c.restore();
+  }
+}
+const BACK = [[-330, -190, 0.42], [-50, -200, 0.5], [230, -196, 0.42]];
+function drawBackHeads(c, P, X, sc) { // tabby heads on stretchy necks sprout from the back and yawn
+  const t = P.t;
+  for (let i = 0; i < 3; i++) {
+    const pop = X.back[i]; if (pop < 0.01) continue;
+    const [bx, by, s0] = BACK[i], s = s0 * pop;
+    const L = pop * (150 + 120 * Math.sin(t * 2.1 + i * 1.7)), bend = 90 * Math.sin(t * 1.7 + i * 2.3);
+    const nw = 300 * s0;
+    c.save(); c.translate(bx, by); c.rotate((i - 1) * 0.35 + 0.25 * Math.sin(t * 1.4 + i * 2.1));
+    c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 40); c.quadraticCurveTo(bend, -L * 0.5, 0, -L);
+    c.strokeStyle = 'rgba(52,38,26,0.85)'; c.lineWidth = nw * 1.1; c.stroke();
+    c.strokeStyle = patScale(PAT.tabby, 0.45); c.lineWidth = nw; c.stroke();
+    c.translate(0, -L); c.rotate(Math.atan2(-L * 0.5, -bend) + (i === 1 ? -0.5 : 0.5) + 0.2 * Math.sin(t * 2.6 + i));
+    c.scale(s, i === 1 ? -s : s);
+    drawTabby(c, X.yawn[i], sc * s);
+    c.restore();
+  }
+}
+const BELLY = [[-250, 196], [-110, 210], [40, 206], [170, 192]];
+function drawDangling(c, P, X, sc) { // kittens dangle by their rumps from the belly and paddle
+  const t = P.t;
+  BELLY.forEach(([x, y], i) => {
+    const pop = elastic(clamp(X.belly * 4 - i)); if (pop < 0.01) return;
+    const s = 0.12 * pop;
+    c.save(); c.translate(x, y); c.rotate(Math.PI / 2 + 0.5 * Math.sin(t * 3.1 + i * 1.3)); c.scale(s, i % 2 ? -s : s);
+    c.translate(-CG.x0, 0);
+    drawCat(c, { lvl: 9, seed: 40 + i, t, walk: 0.7, phase: t * 9 + i, maxLvl: 0, grow: () => 0, tailSwish: 0.4,
+      jaw: 0.2 + 0.4 * Math.max(0, Math.sin(t * 5 + i * 2)), blink: blinkSeed(t, 40 + i), headRot: 0.25 * Math.sin(t * 3 + i) });
+    c.restore();
+  });
+}
+function drawHeadSnake(c, P, X, sc) { // the head goes for a walk on a neck made of more heads
+  const t = P.t, A = X.snake, hp = CG.headPivot, N = 7;
+  const lx = A * 520 * Math.sin(t * 1.9), ly = -A * 420 * (0.6 + 0.4 * Math.cos(t * 1.4 + 0.5));
+  const len = Math.hypot(lx, ly) || 1, nx = -ly / len, ny = lx / len;
+  for (let k = N; k >= 0; k--) {
+    const u = 1 - k / N, wv = A * 90 * Math.sin(Math.PI * u) * Math.sin(t * 5 - u * 7);
+    const s = 0.6 + 0.4 * u;
+    c.save();
+    c.translate(hp[0] + lx * u + nx * wv, hp[1] + ly * u + ny * wv);
+    c.rotate((P.headRot || 0) + A * 0.35 * Math.sin(t * 4 - u * 5)); c.scale(s, s);
+    drawCatHead(c, { t, jaw: (P.jaw || 0) + A * 0.6 * Math.max(0, Math.sin(t * 6 - k)), blink: k ? blinkSeed(t, 40 + k) : P.blink }, sc * s, k === 0 && P.focus);
+    c.restore();
+  }
+}
+
+/* ---------- Scene I: nine lives at once ---------- */
+function tileRow(c, img, left, right, y, tw, th, off, mirrorUp) {
+  off = ((off % (2 * tw)) + 2 * tw) % (2 * tw);
+  let i = 0;
+  for (let x = left - off; x < right; x += tw, i++) {
+    // mirror every other tile so the seams match
+    c.save(); c.translate(i % 2 ? x + tw : x, y); c.scale(i % 2 ? -1 : 1, 1);
+    c.drawImage(img, -0.5, 0, tw + 1, th); // a hair of overlap so no seam shows between tiles
+    if (mirrorUp) { c.scale(1, -1); c.drawImage(img, -0.5, -1, tw + 1, th); }
+    c.restore();
+  }
+}
+function drawTown(c, V, scroll, t, gy) {
+  const k = V.H * 1.0 / ROOFS.h, tw = ROOFS.w * k, top = V.H * 0.02;
+  const left = V.cx - V.D, right = V.cx + V.D;
+  tileRow(c, IMG.sky, left, right, top, tw, ROOFS.skyEnd * k, scroll * 0.1 + t * 14, top > V.cy - V.D);
+  tileRow(c, IMG.town, left, right, top + ROOFS.townTop * k, tw, (ROOFS.h - ROOFS.townTop) * k, scroll * 0.35, false);
+  const kw = Math.max(V.H * 0.32, V.cy + V.D - gy + 40) / (WALL.h - WALL.top);
+  const wy = gy - WALL.top * kw;
+  tileRow(c, IMG.wall, left, right, wy, WALL.w * kw, WALL.h * kw, scroll, false);
+  c.fillStyle = '#d9d5cc'; const bot = wy + WALL.h * kw - 2;
+  if (bot < V.cy + V.D) c.fillRect(left, bot, right - left, V.cy + V.D - bot);
+}
+function distantCats(c, V, t, scroll) { // cats prowl the rooftops; one rolls along like a wheel
+  const span = 2 * V.D + 600, k = Math.min(V.H, V.W * 0.7); // far cats scale with the narrower side, so phones keep them small
+  for (let i = 0; i < 2; i++) {
+    const seed = 500 + i * 97, s = k * (0.045 + 0.012 * i) / 500;
+    const grow = (l, j, sd) => l > 2 ? 0 : elastic(clamp((t - 9.6 - l * 1.3 - hash(sd * 3.3 + j) * 0.6) / 0.85)) * elastic(clamp(depthAnim - l + 1));
+    const x = V.cx - V.D - 300 + frac(0.25 + i * 0.47 - (scroll * 0.35 + t * 40 * (i ? -1 : 1)) / span) * span;
+    const y = V.H * (0.55 + i * 0.07);
+    const mD = grow(1, 0, seed), reach = Math.max(LEG * clamp(1 - 1.4 * mD), CLEN * KID * mD);
+    c.save(); c.translate(x, y); c.scale(i ? -s : s, s);
+    groundShadow(c, 0, 0, 560, 50, 0.25);
+    c.translate(0, -(HIP + reach));
+    drawCat(c, { lvl: 0, seed, t, walk: 0.3, phase: t * 6 + i, maxLvl: 2, grow,
+      jaw: Math.max(0, Math.sin(t * 3 + i)) * 0.4, blink: blinkSeed(t, seed), focus: false, headRot: 0.1 * Math.sin(t * 0.7 + i) });
+    c.restore();
+  }
+  const rs = k * 0.05 / 500, travel = t * 90 + scroll * 0.35;
+  const rx = V.cx + V.D + 200 - frac(travel / span) * span, ry = V.H * 0.5;
+  c.save(); c.translate(rx, ry - 330 * rs); c.rotate(-travel / (330 * rs)); c.scale(rs, rs); c.translate(0, -20);
+  drawCat(c, { lvl: 0, seed: 812, t, walk: 0.8, phase: t * 9, maxLvl: 0, grow: () => 0, jaw: 0.5, blink: 0, headRot: 0.2 * Math.sin(t * 4), tailSwish: 0.5 });
+  c.restore();
+}
+const LV = [0, 4.4, 6.6, 8.6, 10.4];
+const ACT1 = {
+  name: 'Nine lives at once', zoomAt: 15.6,
+  render(c, V, t) {
+    const scroll = 260 * (rampInt(t, 0, 1.2) - rampInt(t, 13.4, 14.6));
+    const walk = 0.22 * smooth(0, 1.2, t) * (1 - smooth(13.4, 14.6, t));
+    const dF = l => elastic(clamp(depthAnim - l + 1));
+    const grow = (l, i, seed) => elastic(clamp((t - LV[l] - hash(seed * 13.7 + i * 3.1) * 0.55) / 0.85)) * dF(l);
+    const gy = V.H * (V.H > V.W * 1.2 ? 0.74 : 0.86); // in portrait the wall rides higher, clear of the controls
+    drawTown(c, V, scroll, t, gy);
+    distantCats(c, V, t, scroll);
+    const X = {
+      tail: clamp((t - 1.4) / 0.4, 0, 9),
+      back: [0, 1, 2].map(i => elastic(clamp((t - 5.2 - i * 0.45) / 0.7))),
+      yawn: [0, 1, 2].map(i => Math.pow(Math.max(0, Math.sin(t * 1.25 - i * 1.1)), 1.5)),
+      belly: clamp((t - 7.8) / 1.0),
+      snake: env(t, 9.6, 13.2),
+    };
+    const m1c = smooth(LV[1], LV[1] + 1.2, t) * clamp(depthAnim);
+    const m2c = smooth(LV[2], LV[2] + 1.2, t) * clamp(depthAnim - 1);
+    const backC = smooth(5.2, 6.4, t), tailC = smooth(1.4, 5.0, t);
+    const reachC = lerp(LEG, CLEN * KID, m1c);
+    const px = Math.min(V.H * 0.6 / (270 + HIP + reachC + 300 * backC + 380 * X.snake), V.W * 0.8 / (1340 + 700 * m2c + 200 * tailC));
+    let mA = 0; for (let i = 0; i < 4; i++) mA += grow(1, i, 0); mA /= 4;
+    const reach = Math.max(LEG * clamp(1 - 1.4 * mA), CLEN * KID * mA);
+    const phase = t * 5.6;
+    const bob = Math.abs(Math.sin(phase)) * 10 * (walk / 0.22);
+    const meow = env(t, 2.8, 5.0), chorus = env(t, 12, 13.8);
+    const settle = 1 - smooth(13.2, 14.2, t);
+    const sway = Math.sin(t * 0.6) * V.W * 0.012 * settle; // a hand-held camera
+    c.save(); c.translate(V.cx - (60 - 150 * tailC) * px + sway, gy); c.scale(px, px);
+    groundShadow(c, 40, 0, 620 + 500 * m2c, 50 + 20 * m2c);
+    c.translate(0, -(HIP + reach * Math.cos(walk * 0.6)) - bob);
+    drawCat(c, {
+      lvl: 0, seed: 0, t, walk, phase, maxLvl: 4, grow, extras: X,
+      jaw: 0.8 * meow + chorus, meowAll: chorus, mouthCat: meow,
+      blink: blinkAt(t, [1.9, 6.4, 11.1]), focus: true,
+      headRot: -0.08 * meow - 0.06 * chorus + 0.05 * Math.sin(t * 1.3) * settle,
+    });
+    c.restore();
+  },
+};
+
+/* ---------- Scene II: an endless yawn ---------- */
+const G2 = 0.52, TH2 = 0.3, P2 = 3.4;  // each face sits in the last one's mouth, a little smaller and turned
+const T2 = new DOMMatrix().translate(KG.mouth[0], KG.mouth[1]).rotate(TH2 * 180 / Math.PI).scale(G2, G2).translate(-KG.face[0], -KG.face[1]);
+const T2i = T2.inverse();
+const Z2 = (() => { // fixed point of the face-in-mouth map: the tunnel's vanishing point
+  const a11 = 1 - T2.a, a12 = -T2.c, a21 = -T2.b, a22 = 1 - T2.d, det = a11 * a22 - a12 * a21;
+  return { x: (T2.e * a22 - a12 * T2.f) / det, y: (a11 * T2.f - a21 * T2.e) / det };
+})();
+const BEAT = 1.7, Z2Y = 0.2; // the tunnel's vanishing point sits a little below the middle of the screen
+const yawnWave = (t, abs) => bump(frac(t / BEAT - abs * 0.17)); // a yawn ripples down the tunnel
+function throat(c, V, t) {
+  c.save(); c.translate(V.cx, V.cy); c.rotate(t * 0.15);
+  const R = V.D * 1.05, n = 14;
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0, '#f2b9a6'); g.addColorStop(0.25, '#b2414a'); g.addColorStop(0.7, '#3d0d12'); g.addColorStop(1, '#120406');
+  c.fillStyle = g; c.fillRect(-R, -R, 2 * R, 2 * R);
+  c.fillStyle = `rgba(20,4,6,${0.3 + 0.12 * bump(frac(t / BEAT))})`; c.beginPath();
+  for (let i = 0; i < n; i += 2) { const a0 = i / n * TAU; c.moveTo(0, 0); c.arc(0, 0, R, a0, a0 + TAU / n); c.closePath(); }
+  c.fill();
+  c.restore();
+}
+function flyingCats(c, V, t) { // ginger cats come tumbling up out of the throat
+  const N = 7, rmin = V.D * 0.05, rmax = V.D * 1.4, L = Math.log(rmax / rmin), items = [], oy = V.cy + Math.min(V.W, V.H) * Z2Y;
+  for (let j = 0; j < N; j++) { const life = frac(t * 0.16 + j / N); items.push({ j, life, r: rmin * Math.exp(life * L) }); }
+  items.sort((a, b) => a.r - b.r);
+  for (const it of items) {
+    const j = it.j, a = j / N * TAU + t * 0.3 + it.life * 2.2;
+    c.save(); c.translate(V.cx + Math.cos(a) * it.r, oy + Math.sin(a) * it.r);
+    c.rotate(t * (1 + hash(j)) * (j % 2 ? 1 : -1) + j);
+    const s = it.r * 0.00048; c.scale(s, s);
+    drawCat(c, { lvl: 0, seed: 900 + j, t, walk: 0.7, phase: t * 9 + j, maxLvl: 0, grow: () => 0, tailSwish: 0.5,
+      jaw: 0.5 + 0.4 * Math.sin(t * 5 + j), blink: 0, headRot: 0.3 * Math.sin(t * 3 + j) });
+    c.restore();
+  }
+}
+const ACT2 = {
+  name: 'Endless yawn', zoomAt: 11,
+  render(c, V, t) {
+    throat(c, V, t);
+    const ph = t / P2, b = Math.floor(ph), f = ph - b;
+    const minWH = Math.min(V.W, V.H), sc = minWH * 0.95 / KG.w / Math.pow(G2, f);
+    c.save();
+    c.translate(V.cx, V.cy + minWH * Z2Y); c.rotate(-TH2 * f + 0.12 * Math.sin(t * 0.7)); c.scale(sc, sc); c.translate(-Z2.x, -Z2.y);
+    c.transform(T2i.a, T2i.b, T2i.c, T2i.d, T2i.e, T2i.f);
+    yawnChain(c, b - 1, t, 0);
+    c.restore();
+    flyingCats(c, V, t);
+  },
+};
+const FOCUS2 = Math.floor(ACT2.zoomAt / P2) + 1;
+function yawnChain(c, abs, t, n) {
+  const m = c.getTransform(), sc = Math.hypot(m.a, m.b);
+  if (sc * KG.w < 3 || n > 16) return;
+  const w = yawnWave(t, abs), g = hash(abs * 7.3 + 1);
+  drawYawnHead(c, {
+    jy: 0.9 + 0.22 * w, focus: abs === FOCUS2,
+    lx: Math.sin(t * 1.3 + abs * 2.1), ly: 0.6 * Math.sin(t * 1.7 + abs), blink: blinkSeed(t, abs + 50),
+  }, sc, () => {
+    c.save(); c.transform(T2.a, T2.b, T2.c, T2.d, T2.e, T2.f);
+    // each face wriggles about its own nose and swells as the yawn passes through it
+    const rw = 0.12 * Math.sin(t * 2.1 + (abs + 1) * 1.3 + g), pb = 1 + 0.06 * yawnWave(t, abs + 1);
+    c.translate(KG.face[0], KG.face[1]); c.rotate(rw); c.scale(pb, pb); c.translate(-KG.face[0], -KG.face[1]);
+    yawnChain(c, abs + 1, t, n + 1);
+    c.restore();
+  });
+}
+
+/* ---------- Scene III: purr mandala around one amber eye ---------- */
+let WEDGE = null, WX = null, WPAT = null;
+function drawAmberEye(c, k, lx, ly, blink, dil, focus) {
+  const F = EYE.amber.full, ox = lx * 34, oy = ly * 24;
+  c.save(); c.scale(k, k);
+  c.drawImage(IMG.amberFull, -F.px + ox, -F.py + oy);
+  c.translate(ox, oy);
+  if (dil > 0.01) { // the pupil opens and closes with the purr
+    const rx = F.rx * (1 + 0.55 * dil), ry = F.ry * (1 + 0.12 * dil);
+    c.save(); c.scale(rx, ry);
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, '#05080c'); g.addColorStop(0.86, '#070a0e'); g.addColorStop(1, 'rgba(7,10,14,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(0, 0, 1, 0, TAU); c.fill(); c.restore();
+  }
+  if (blink > 0.01) { // a furry lid comes down from the top
+    const top = -F.py - oy, lid = top + (F.w + 40) * blink;
+    c.fillStyle = patScale(PAT.black, 2.2);
+    c.beginPath(); c.moveTo(-F.px - ox, top); c.lineTo(F.px - ox, top); c.lineTo(F.px - ox, lid - 160);
+    c.quadraticCurveTo(0, lid + 120, -F.px - ox, lid - 160); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.85)'; c.lineWidth = 26; c.stroke();
+  }
+  if (focus && REC) { REC.m = c.getTransform(); REC.kind = 'amber'; }
+  c.restore();
+}
+const ACT3 = {
+  name: 'Purr mandala', zoomAt: 12,
+  render(c, V, t) {
+    const R = V.D * 1.03, q = Math.min(DPR, 1.25), size = Math.ceil(R * q) + 2;
+    if (!WEDGE || WEDGE.width !== size) {
+      WEDGE = mk(size, size); WX = WEDGE.getContext('2d');
+      WPAT = ['ginger', 'roof', 'tabby', 'black'].map(k => WX.createPattern(TILE[k], 'repeat'));
+    }
+    const w = WX, n = 6, al = Math.PI / n, minWH = Math.min(V.W, V.H);
+    w.setTransform(1, 0, 0, 1, 0, 0); w.clearRect(0, 0, size, size); w.imageSmoothingQuality = 'low';
+    w.setTransform(q, 0, 0, q, 0, 0);
+    // rings of fur and roof tiles flowing outward
+    const rate = 0.28, K = 1.32, r0 = R * 0.02, u = t * rate, b = Math.floor(u), f = u - b;
+    for (let i = 18; i >= -2; i--) { // each ring is an annulus, so every pixel is painted once
+      const r = r0 * Math.pow(K, i + f), rIn = i === -2 ? 0 : r / K;
+      if (rIn > R * 1.5) continue;
+      const p = WPAT[((i - b) % 4 + 4) % 4], ks = r / 380;
+      p.setTransform(new DOMMatrix([ks, 0, 0, ks, 0, 0]));
+      w.beginPath(); w.arc(0, 0, r, -0.01, Math.PI / 2 + 0.01);
+      if (rIn > 0) w.arc(0, 0, rIn, Math.PI / 2 + 0.01, -0.01, true); else w.lineTo(0, 0);
+      w.closePath();
+      w.fillStyle = p; w.fill();
+      if ((i - b) % 2) { w.fillStyle = 'rgba(10,6,4,0.18)'; w.fill(); }
+    }
+    // ginger cats blooming outward at the same rate
+    const N = 10, rmin = R * 0.22, rmax = R * 1.5, Lr = Math.log(rmax / rmin), rate2 = rate * Math.log(K) / Lr;
+    const items = [];
+    for (let j = 0; j < N; j++) items.push({ j, r: rmin * Math.exp(frac(t * rate2 + j / N) * Lr) });
+    items.sort((A, B) => A.r - B.r);
+    for (const it of items) {
+      const j = it.j, h = hash(j * 9.1 + 3);
+      const th = al * (0.2 + 0.6 * frac(j * 0.618 + 0.1)) + 0.07 * Math.sin(t * 0.9 + j);
+      const s = it.r * 0.00046 * (0.85 + 0.3 * h);
+      w.save(); w.translate(Math.cos(th) * it.r, Math.sin(th) * it.r);
+      w.rotate(th + j * 1.7 + t * (0.35 + h * 0.6) * (j % 2 ? 1 : -1)); w.scale(s, s);
+      drawCat(w, {
+        lvl: 0, seed: 300 + j * 11, t, walk: 0.5, phase: t * (6 + h * 3) + j, maxLvl: 1, tailSwish: 0.35,
+        grow: l => (l === 1 && j % 2 === 0) ? elastic(clamp(depthAnim - 1)) : 0,
+        jaw: 0.3 + 0.4 * Math.sin(t * 3.1 + j), blink: blinkSeed(t, j + 300), focus: false, headRot: 0.15 * Math.sin(t * 2 + j),
+      });
+      w.restore();
+    }
+    // a ring of yawning tabbies, mirrored into a flower around the eye
+    const Rc = minWH * 0.22, sh = minWH * 0.17 / TG.w;
+    w.save(); w.rotate(al * 0.5); w.translate(Rc * 1.2, 0); w.scale(sh, sh);
+    drawTabby(w, Math.pow(Math.max(0, Math.sin(t * TAU / (2 * BEAT))), 1.4), sh * q);
+    w.restore();
+    // fold the wedge into 12 mirrored sectors
+    c.save(); c.translate(V.cx, V.cy); c.rotate(t * 0.07);
+    for (let k = 0; k < 2 * n; k++) {
+      c.save();
+      if (k % 2 === 0) c.rotate(k * al); else { c.rotate((k + 1) * al); c.scale(1, -1); }
+      c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R, -0.003, al + 0.003); c.closePath(); c.clip();
+      c.drawImage(WEDGE, 0, 0, size / q, size / q);
+      c.restore();
+    }
+    c.restore();
+    // the eye, set into a ring of black fur like a porthole
+    const settle = 1 - smooth(10.8, 11.7, t);
+    c.save(); c.translate(V.cx, V.cy);
+    c.save(); c.rotate(-t * 0.2);
+    c.shadowColor = 'rgba(10,6,2,0.55)'; c.shadowBlur = 18; c.shadowOffsetY = 5;
+    c.fillStyle = patScale(PAT.black, 0.8); c.beginPath(); c.arc(0, 0, Rc * 1.13, 0, TAU); c.fill();
+    c.restore();
+    c.lineWidth = Math.max(2, Rc * 0.022); c.strokeStyle = '#f3a7ae';
+    c.beginPath(); c.arc(0, 0, Rc * 1.13, 0, TAU); c.stroke();
+    c.beginPath(); c.arc(0, 0, Rc, 0, TAU); c.stroke();
+    c.save(); c.clip();
+    const ke = Rc * 1.05 / EYE.amber.full.iris;
+    const purr = 0.5 + 0.5 * Math.sin(t * TAU / BEAT);
+    drawAmberEye(c, ke * (1 + 0.02 * Math.sin(t * 1.3) * settle),
+      0.8 * Math.sin(t * 0.9) * settle, 0.6 * Math.sin(t * 1.3 + 1) * settle,
+      blinkAt(t, [2.6, 6.1, 9.2]) * settle, (0.25 + 0.75 * purr) * settle, true);
+    c.restore();
+    c.restore();
+  },
+};
+
+const ACTS = [ACT1, ACT2, ACT3];
+const ROMAN = ['I', 'II', 'III'];
+const ZD = 3.2; // seconds spent falling through a pupil
+
+/* ---------- sound: real recorded meows, only after the viewer turns it on ---------- */
+let AC = null, MASTER = null, NOISEBUF = null, soundOn = false, meowTimes = [], PURR = null;
+const RAW = {}, BUF = {};
+function prefetchAudio() {
+  for (const n of CLIPS) fetch(`assets/${n}.mp3`).then(r => r.ok ? r.arrayBuffer() : null).then(b => { if (b) RAW[n] = b; }).catch(() => {});
+}
+async function audioInit() {
+  if (AC) return true;
+  const C = window.AudioContext || window.webkitAudioContext; if (!C) return false;
+  AC = new C(); MASTER = AC.createGain(); MASTER.gain.value = 0.9;
+  const comp = AC.createDynamicsCompressor(); MASTER.connect(comp); comp.connect(AC.destination);
+  NOISEBUF = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+  const d = NOISEBUF.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  await Promise.all(CLIPS.map(async n => {
+    try {
+      const raw = RAW[n] || await fetch(`assets/${n}.mp3`).then(r => r.arrayBuffer());
+      BUF[n] = await AC.decodeAudioData(raw.slice(0));
+    } catch (e) { /* a missing clip just stays silent */ }
+  }));
+  return MEOWS.some(n => BUF[n]);
+}
+function meow(name, rate = 1, vol = 0.8, delay = 0) {
+  if (!soundOn || !AC || !BUF[name]) return;
+  const now = AC.currentTime;
+  meowTimes = meowTimes.filter(x => x > now - 0.6); if (meowTimes.length > 6) return; meowTimes.push(now);
+  const src = AC.createBufferSource(); src.buffer = BUF[name]; src.playbackRate.value = rate;
+  const g = AC.createGain(); g.gain.value = vol;
+  src.connect(g); g.connect(MASTER); src.start(now + 0.01 + delay);
+}
+function whoosh(dur) {
+  if (!soundOn || !AC) return;
+  const t0 = AC.currentTime + 0.02, src = AC.createBufferSource(); src.buffer = NOISEBUF; src.loop = true;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+  bp.frequency.setValueAtTime(180, t0); bp.frequency.exponentialRampToValueAtTime(2600, t0 + dur * 0.9);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.13, t0 + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp); bp.connect(g); g.connect(MASTER); src.start(t0); src.stop(t0 + dur + 0.05);
+  meow('hiss', 0.9, 0.55, dur * 0.15);
+}
+function purrLevel(target) { // the purr loop runs only through the mandala
+  if (!AC || !BUF.purr) return;
+  if (!PURR && target > 0) {
+    const src = AC.createBufferSource(); src.buffer = BUF.purr; src.loop = true;
+    src.loopStart = 0.06; src.loopEnd = BUF.purr.duration - 0.06;
+    const g = AC.createGain(); g.gain.value = 0.0001; src.connect(g); g.connect(MASTER); src.start();
+    PURR = { src, g, level: 0 };
+  }
+  if (PURR && Math.abs(PURR.level - target) > 0.01) {
+    PURR.level = target; PURR.g.gain.setTargetAtTime(Math.max(0.0001, target), AC.currentTime, 0.4);
+  }
+}
+function fireEvents(a, t0, t1) {
+  if (!soundOn) return;
+  const X = x => t0 < x && t1 >= x;
+  if (a === 0) {
+    if (X(2.9)) meow('meow-a', 1, 0.9);
+    if (X(3.6)) meow('meow-c', 1.5, 0.45);
+    for (let L = 1; L <= depth; L++) if (X(LV[L])) {
+      const n = Math.min(4, 2 + L);
+      for (let i = 0; i < n; i++) meow(MEOWS[(L + i) % MEOWS.length], 1.25 + 0.3 * L + Math.random() * 0.25, 0.35, Math.random() * 0.6);
+    }
+    for (let i = 0; i < 3; i++) if (X(5.2 + i * 0.45)) meow('meow-g', 0.8 + 0.12 * i, 0.5);
+    if (X(7.8)) for (let i = 0; i < 3; i++) meow('meow-d', 1.9 + i * 0.25, 0.3, i * 0.2);
+    if (X(9.6)) meow('meow-b', 0.85, 0.85);
+    if (X(12.0)) { meow('meow-e', 1, 0.9); meow('meow-f', 1.2, 0.5, 0.08); meow('meow-c', 1.6, 0.35, 0.16); meow('meow-d', 2.1, 0.3, 0.24); }
+  } else if (a === 1) {
+    const k0 = Math.floor(t0 / BEAT), k1 = Math.floor(t1 / BEAT);
+    if (k1 > k0) meow(MEOWS[k1 % MEOWS.length], 0.75 + 0.12 * (k1 % 4), 0.65);
+  } else {
+    const k0 = Math.floor(t0 / (2 * BEAT)), k1 = Math.floor(t1 / (2 * BEAT));
+    if (k1 > k0) meow(MEOWS[(k1 * 3) % MEOWS.length], 0.8 + hash(k1) * 0.9, 0.5);
+  }
+}
+
+/* ---------- timeline and the fall through each eye ---------- */
+const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+let act = 0, tA = 0, trans = null, paused = false, focusLocal = null, last = performance.now(), dirty = true, grainOff = [0, 0];
+let READY = false, LOAD_ERR = false;
+const GRAIN = (() => { // light and dark specks with their own alpha, so plain blending reads as film grain
+  const c = mk(256, 256), g = c.getContext('2d'), img = g.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.random() < 0.5 ? 0 : 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = Math.random() * 30 | 0;
+  }
+  g.putImageData(img, 0, 0); return ctx.createPattern(c, 'repeat');
+})();
+
+function advance(dt) {
+  if (!trans) {
+    tA += dt;
+    if (tA >= ACTS[act].zoomAt) { trans = { e: 0, tB: 0 }; whoosh(ZD); }
+  } else {
+    trans.e += dt;
+    const u = clamp(trans.e / ZD);
+    tA += dt * 0.22 * Math.pow(1 - u, 4); // the old scene nearly freezes while we fall
+    trans.tB += dt;
+    if (trans.e >= ZD) { act = (act + 1) % ACTS.length; tA = trans.tB; trans = null; focusLocal = null; syncUI(); }
+  }
+}
+function render() {
+  if (!W || !H) return;
+  const V = { W, H, cx: W / 2, cy: H / 2, D: Math.hypot(W, H) / 2 };
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#120f0e'; ctx.fillRect(0, 0, cv.width, cv.height);
+  let z = 1, ex = 0, ey = 0, px = 0, py = 0;
+  if (trans) {
+    const F = focusLocal || { x: V.cx, y: V.cy, r: 4 };
+    const u = smooth(0, 1, trans.e / ZD), Zmax = Math.max(1.0001, V.D / F.r);
+    z = Math.pow(Zmax, u);
+    const k = (z - 1) / (Zmax - 1);
+    ex = F.x; ey = F.y; px = ex + (V.cx - ex) * k; py = ey + (V.cy - ey) * k;
+  }
+  const base = new DOMMatrix([DPR * z, 0, 0, DPR * z, DPR * (px - z * ex), DPR * (py - z * ey)]);
+  ctx.setTransform(base);
+  REC = { m: null, kind: 'amber' };
+  ACTS[act].render(ctx, V, tA);
+  const rec = REC; REC = null;
+  if (rec.m) {
+    const L = base.inverse().multiply(rec.m);
+    focusLocal = { x: L.e, y: L.f, r: EYE[rec.kind].full.ry * Math.hypot(L.c, L.d) };
+  }
+  if (trans) {
+    const u = trans.e / ZD;
+    let cx, cy, Rp, clipTo = null;
+    if (rec.m) {
+      // as we approach, the cat's eye becomes the real close-up, then its pupil opens wide to let us in
+      const E = EYE[rec.kind].full, a = smooth(0.06, 0.32, u), d = smooth(0.18, 0.72, u);
+      const rx = lerp(E.rx, E.ry * 1.04, d), ry = E.ry * (1 + 0.04 * d);
+      ctx.save(); ctx.setTransform(rec.m);
+      if (a > 0.01) { ctx.globalAlpha = a; ctx.drawImage(rec.kind === 'ginger' ? IMG.gingerFull : IMG.amberFull, -E.px, -E.py); ctx.globalAlpha = 1; }
+      if (d > 0.01) {
+        ctx.save(); ctx.scale(rx, ry);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        g.addColorStop(0, '#040506'); g.addColorStop(0.9, '#06070a'); g.addColorStop(1, 'rgba(6,7,10,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.fill(); ctx.restore();
+      }
+      ctx.restore();
+      clipTo = { m: rec.m, rx: rx * 0.94, ry: ry * 0.94 };
+      cx = rec.m.e / DPR; cy = rec.m.f / DPR; Rp = 0.94 * ry * Math.hypot(rec.m.c, rec.m.d) / DPR;
+    } else { cx = px; cy = py; Rp = z * 4; }
+    if (u > 0.985) { cx = V.cx; cy = V.cy; Rp = Math.max(Rp, V.D); clipTo = null; }
+    ctx.save();
+    if (clipTo) { ctx.setTransform(clipTo.m); ctx.beginPath(); ctx.ellipse(0, 0, clipTo.rx, clipTo.ry, 0, 0, TAU); }
+    else { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.beginPath(); ctx.arc(cx, cy, Rp, 0, TAU); }
+    ctx.clip();
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const s = Rp / V.D;
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-V.cx, -V.cy);
+    ACTS[(act + 1) % ACTS.length].render(ctx, V, trans.tB);
+    ctx.restore();
+  }
+  postFX(V);
+}
+function postFX(V) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = ctx.createRadialGradient(V.cx, V.cy, Math.min(V.W, V.H) * 0.4, V.cx, V.cy, V.D * 1.02);
+  g.addColorStop(0, 'rgba(24,10,8,0)'); g.addColorStop(1, 'rgba(24,10,8,0.42)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, V.W, V.H);
+  ctx.setTransform(1, 0, 0, 1, -grainOff[0], -grainOff[1]);
+  ctx.fillStyle = GRAIN; ctx.fillRect(grainOff[0], grainOff[1], cv.width, cv.height);
+}
+function drawWaiting() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#120f0e'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#f7f2e6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '500 14px "DM Mono", ui-monospace, Menlo, monospace';
+  if (LOAD_ERR) {
+    ctx.fillText('The cat photos did not load.', W / 2, H / 2 - 10);
+    ctx.fillText('Reload the page to try again.', W / 2, H / 2 + 12);
+  } else ctx.fillText('Herding cats…', W / 2, H / 2);
+}
+function frame(now) {
+  const realDt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
+  if (!READY) { drawWaiting(); requestAnimationFrame(frame); return; }
+  const dt = paused ? 0 : realDt;
+  if (Math.abs(depthAnim - depth) > 0.0005) {
+    const step = realDt * 1.6; depthAnim += clamp(depth - depthAnim, -step, step); dirty = true;
+  }
+  if (dt > 0 || dirty) {
+    const prevAct = act, prevT = tA;
+    advance(dt);
+    if (act === prevAct && dt > 0) fireEvents(act, prevT, tA);
+    if (!paused) grainOff = [Math.random() * 256 | 0, Math.random() * 256 | 0];
+    render();
+    dirty = false;
+  }
+  if (soundOn) purrLevel(!paused && (act === 2 || (act === 1 && trans && trans.e > ZD * 0.4)) ? 0.55 : 0);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- controls ---------- */
+const $ = id => document.getElementById(id);
+const chips = [...document.querySelectorAll('[data-act]')];
+let soundState = 'off';
+function syncUI() {
+  $('sceneLabel').textContent = `Scene ${ROMAN[act]} · ${ACTS[act].name}`;
+  chips.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.act === act)));
+  $('playBtn').textContent = paused ? 'Play' : 'Pause';
+  $('soundBtn').textContent = { off: 'Sound off', loading: 'Loading meows…', on: 'Sound on', none: 'No sound here' }[soundState];
+  $('soundBtn').setAttribute('aria-pressed', String(soundOn));
+  $('soundBtn').disabled = soundState === 'loading' || soundState === 'none';
+  $('depthVal').textContent = depth;
+  $('depthDown').disabled = depth <= 1;
+  $('depthUp').disabled = depth >= 4;
+}
+function jumpTo(i) { act = (i + ACTS.length) % ACTS.length; tA = 0; trans = null; focusLocal = null; dirty = true; syncUI(); }
+function setPaused(p) { paused = p; last = performance.now(); dirty = true; syncUI(); }
+chips.forEach(b => b.addEventListener('click', () => jumpTo(+b.dataset.act)));
+$('playBtn').addEventListener('click', () => setPaused(!paused));
+$('depthDown').addEventListener('click', () => { depth = Math.max(1, depth - 1); syncUI(); });
+$('depthUp').addEventListener('click', () => { depth = Math.min(4, depth + 1); syncUI(); });
+$('soundBtn').addEventListener('click', async () => {
+  if (soundOn) { soundOn = false; soundState = 'off'; purrLevel(0); syncUI(); return; }
+  if (!AC) {
+    if (!(window.AudioContext || window.webkitAudioContext)) { soundState = 'none'; syncUI(); return; }
+    soundState = 'loading'; syncUI();
+  }
+  const ok = await audioInit();
+  if (AC && AC.resume) AC.resume();
+  if (!ok) { soundState = 'none'; syncUI(); return; }
+  soundOn = true; soundState = 'on'; syncUI();
+  meow('meow-a', 1, 0.9);
+});
+$('creditsBtn').addEventListener('click', () => {
+  const open = $('credits').hidden;
+  $('credits').hidden = !open;
+  $('creditsBtn').setAttribute('aria-expanded', String(open));
+});
+window.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('button, a')) return;
+  if (e.key === ' ') { e.preventDefault(); setPaused(!paused); }
+  else if (e.key === 'ArrowRight') jumpTo(act + 1);
+  else if (e.key === 'ArrowLeft') jumpTo(act - 1);
+});
+window.addEventListener('resize', () => { resize(); dirty = true; });
+
+function start(d) {
+  if (d && typeof d.act === 'number') {
+    act = d.act % ACTS.length; tA = d.tA || 0;
+    depth = clamp(d.depth || 3, 1, 4); depthAnim = depth; paused = !!d.paused;
+  } else if (RM) { paused = true; tA = 11.4; }
+  resize();
+  syncUI();
+  last = performance.now();
+  requestAnimationFrame(frame);
+  Promise.all(Object.entries(FILES).map(([k, f]) => loadImg(`assets/${f}`).then(i => { IMG[k] = i; })))
+    .then(() => { buildSprites(); READY = true; dirty = true; last = performance.now(); prefetchAudio(); })
+    .catch(() => { LOAD_ERR = true; });
+}
+window.claude?.hot?.snapshot?.(() => ({ act, tA, depth, paused }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
